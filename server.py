@@ -19,7 +19,7 @@ class ChatServer:
         try:
             self.server_socket.bind((hostname, port))
         except socket.error:
-            print("Bind failed: {}".socket.error)
+            print("Bind failed: {}".format(socket.error))
             sys.exit()
 
         self.server_socket.listen(10)
@@ -40,25 +40,38 @@ class ChatServer:
 
     def listen_to_client(self, username, client_socket):
         print("Client connected with username " + username)
+        self.broadcast(username, "<{} has connected>\n".format(username))
 
         while True:
             try:
-                data = client_socket.recv(RECV_BUFFER)
+                data = client_socket.recv(RECV_BUFFER).decode().strip()
 
                 if data:
-                    self.broadcast(username, data)
+                    if data in ["/quit", "/part", "/exit"]:
+                        client_socket.close()
+                        del self.users[username]
+
+                        print("{} command from {}".format(data, username))
+                        self.broadcast(username, "<{} has disonnected>\n".format(username))
+
+                        return
+
+                    self.broadcast(username, "[{}] {}\n".format(username, data))
                 else:
                     raise error('Client disconnected')
             except:
                 client_socket.close()
-                return False
+                del self.users[username]
 
-    def broadcast(self, username, message):
+                return
+
+    def broadcast(self, sender, message):
         for user, socket in self.users.items():
-            # send the message only to peer
-            if user != username:
+            # send the message to everyone except sender
+            if user != sender:
                 try:
-                    socket.send(message)
+                    #socket.send("[{}] {}".format(sender, message).encode())
+                    socket.send(message.encode())
                 except Exception as e:
                     # broken socket connection
                     socket.close()
