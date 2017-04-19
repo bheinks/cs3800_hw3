@@ -34,7 +34,7 @@ class ChatServer:
                 client_socket, address = self.server_socket.accept()
             except KeyboardInterrupt:
                 self.shutdown()
-                return
+                return 0
 
             username = client_socket.recv(RECV_BUFFER).decode()
 
@@ -55,6 +55,7 @@ class ChatServer:
                 self.client_threads[-1].start()
             except:
                 print("Error creating thread")
+                return 1
 
     def listen_to_client(self, username, client_socket):
         print("Client connected with username " + username)
@@ -70,7 +71,7 @@ class ChatServer:
                 data = client_socket.recv(RECV_BUFFER).decode()
 
                 if data:
-                    if data.strip() in ["/quit", "/part", "/exit"]:
+                    if data.strip() in ["/exit", "/quit", "/part"]:
                         print("{} command from {}".format(data.strip(), username))
 
                         self.broadcast(username, "<{} has disonnected>".format(username))
@@ -110,6 +111,9 @@ class ChatServer:
 
         for username in self.users.keys():
             self.users[username].shutdown(socket.SHUT_RDWR)
+
+        for thread in self.client_threads:
+            thread.join()
         
         self.server_socket.close()
 

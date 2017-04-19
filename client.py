@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import sys
 import socket
+import sys
 
-from threading import Thread
 from select import select
+from threading import Thread
  
 class ChatClient:
     def __init__(self, hostname, port, username):
@@ -37,6 +37,7 @@ class ChatClient:
 
             if not data:
                 print("Disconnected from chat server. Exiting...")
+                # break out of read() loop
                 self.reading = False
                 break
             else:
@@ -45,7 +46,7 @@ class ChatClient:
                 sys.stdout.write('> ')
                 sys.stdout.flush()     
     
-    def start(self):
+    def read(self):
         self.reading = True
 
         sys.stdout.write('> ')
@@ -67,12 +68,14 @@ class ChatClient:
 
                 self.server_socket.send(msg.encode())
                 
-                if msg.strip() in ["/quit", "/part", "/exit"]:
+                if msg.strip() in ["/exit", "/quit", "/part"]:
+                    self.reading = False
                     self.listen_thread.join()
-                    return
+            
+        return 0
 
 if __name__ == "__main__":
     hostname, port = input("Hostname: ").split(':')
     username = input("Username: ")
 
-    sys.exit(ChatClient(hostname, int(port), username).start())
+    sys.exit(ChatClient(hostname, int(port), username).read())
