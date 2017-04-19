@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import sys
 import socket
-import select
-import threading
 
-HOST = '' 
+from sys import exit
+from threading import Thread
+from time import sleep
+
 RECV_BUFFER = 4096 
 
 class ChatServer:
@@ -15,12 +15,13 @@ class ChatServer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.users = {}
+        self.client_threads = []
 
         try:
             self.server_socket.bind((hostname, port))
         except socket.error:
             print("Bind failed: {}".format(socket.error))
-            sys.exit()
+            exit()
 
         self.server_socket.listen(10)
 
@@ -29,57 +30,85 @@ class ChatServer:
         print("Chat server started on {}".format(self.port))
 
         while True:
-            client_socket, address = self.server_socket.accept()
-            username = client_socket.recv(RECV_BUFFER).decode()
-            self.users[username] = client_socket
+            try:
+                client_socket, address = self.server_socket.accept()
+            except KeyboardInterrupt:
+                self.shutdown()
+                return
 
-            threading.Thread(
-                    target = self.listen_to_client,
-                    args = (username, client_socket)
-                ).start()
+            username = client_socket.recv(RECV_BUFFER).decode()
+
+            # duplicate username
+            if username in self.users:
+                print("User {} already exists".format(username))
+                self.send_message(client_socket, "<Username taken, please select another>")
+                client_socket.close()
+                continue
+
+            self.users[username] = client_socket
+             
+            self.client_threads.append(Thread(
+                target = self.listen_to_client,
+                args = (username, client_socket)))
+
+            self.client_threads[-1].start()
 
     def listen_to_client(self, username, client_socket):
         print("Client connected with username " + username)
-        self.broadcast(username, "<{} has connected>\n".format(username))
+        self.send_message(
+                client_socket,
+                "<Welcome, {}! There are {} other user(s) currectly connected>" \
+                .format(username, len(self.users) - 1))
+
+        self.broadcast(username, "<{} has connected>".format(username))
 
         while True:
             try:
-                data = client_socket.recv(RECV_BUFFER).decode().strip()
+                data = client_socket.recv(RECV_BUFFER).decode()
 
                 if data:
-                    if data in ["/quit", "/part", "/exit"]:
-                        client_socket.close()
-                        del self.users[username]
+                    if data.strip() in ["/quit", "/part", "/exit"]:
+                        print("{} command from {}".format(data.strip(), username))
 
-                        print("{} command from {}".format(data, username))
-                        self.broadcast(username, "<{} has disonnected>\n".format(username))
+                        self.broadcast(username, "<{} has disonnected>".format(username))
+                        self.disconnect(username)
 
                         return
 
-                    self.broadcast(username, "[{}] {}\n".format(username, data))
+                    self.broadcast(username, "[{}] {}".format(username, data.strip()))
                 else:
-                    raise error('Client disconnected')
+                    self.disconnect(username)
+                    return
             except:
-                client_socket.close()
-                del self.users[username]
-
+                self.disconnect(username)
                 return
 
+    def send_message(self, sock, message):
+        sock.send("{}\n".format(message).encode())
+
     def broadcast(self, sender, message):
-        for user, socket in self.users.items():
+        for username, sock in self.users.items():
             # send the message to everyone except sender
-            if user != sender:
+            if username != sender:
                 try:
-                    #socket.send("[{}] {}".format(sender, message).encode())
-                    socket.send(message.encode())
+                    self.send_message(sock, message)
                 except Exception as e:
-                    # broken socket connection
-                    socket.close()
-                    print("broken socket")
-                    print(e)
-                    # broken socket, remove it
-                    #if socket in self.socket_list:
-                    #    self.socket_list.remove(socket)
+                    print("Broken socket connection to {}: {}".format(username, e))
+                    self.disconnect(username)
+
+    def disconnect(self, username):
+        self.users[username].close()
+        del self.users[username]
+
+    def shutdown(self):
+        print("Shutting down server in 10 seconds")
+        self.broadcast(None, "<Warning: Server shutting down in 10 seconds>")
+        sleep(10)
+
+        for username in self.users.keys():
+            self.users[username].shutdown(socket.SHUT_RDWR)
+        
+        self.server_socket.close()
 
 if __name__ == "__main__":
-    sys.exit(ChatServer('', 9009).listen())
+    exit(ChatServer('', 9009).listen())
