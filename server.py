@@ -19,15 +19,15 @@ class ChatServer:
 
         try:
             self.server_socket.bind((hostname, port))
-        except socket.error:
-            print("Bind failed: {}".format(socket.error))
+        except socket.error as e:
+            print("Unable to bind: {}".format(e))
             exit()
 
         self.server_socket.listen(10)
 
     def listen(self):
         # listen for up to 10 simultaneous clients
-        print("Chat server started on {}".format(self.port))
+        print("Chat server started on {}:{}".format(self.hostname, self.port))
 
         while True:
             try:
@@ -47,11 +47,14 @@ class ChatServer:
 
             self.users[username] = client_socket
              
-            self.client_threads.append(Thread(
-                target = self.listen_to_client,
-                args = (username, client_socket)))
+            try:
+                self.client_threads.append(Thread(
+                    target = self.listen_to_client,
+                    args = (username, client_socket)))
 
-            self.client_threads[-1].start()
+                self.client_threads[-1].start()
+            except:
+                print("Error creating thread")
 
     def listen_to_client(self, username, client_socket):
         print("Client connected with username " + username)
