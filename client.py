@@ -8,7 +8,7 @@ from threading import Thread
  
 class ChatClient:
     def __init__(self, hostname, port, username):
-        self.username = username
+        # initialize socket
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # set socket to blocking
@@ -22,7 +22,7 @@ class ChatClient:
             sys.exit()
          
         # send username to server
-        self.server_socket.send(self.username.encode())
+        self.server_socket.send(username.encode())
 
         # spin up thread responsible for receiving server messages
         try:
@@ -31,6 +31,7 @@ class ChatClient:
         except:
             print("Error creating thread")
 
+    # receive and display messages from server
     def listen(self):
         while True:
             data = self.server_socket.recv(4096).decode()
@@ -41,7 +42,7 @@ class ChatClient:
                 self.reading = False
                 break
             else:
-                # print data
+                # print message
                 sys.stdout.write(data)
                 sys.stdout.write('> ')
                 sys.stdout.flush()     
@@ -53,7 +54,7 @@ class ChatClient:
         sys.stdout.flush() 
 
         while self.reading:
-            # timeout on blocking readline() operation so we can check self.reading is still True
+            # timeout on blocking readline() operation so we can check value of self.reading
             ready_to_read, ready_to_write, error = select([sys.stdin], [], [], 3)
 
             if ready_to_read:
@@ -62,10 +63,12 @@ class ChatClient:
 
                 try:
                     msg = sys.stdin.readline()
+                # catch ctrl+c and print commands for exiting
                 except KeyboardInterrupt:
                     print("\nPlease type /exit, /quit or /part to exit the chatroom")
                     continue
 
+                # send message to server
                 self.server_socket.send(msg.encode())
                 
                 if msg.strip() in ["/exit", "/quit", "/part"]:
