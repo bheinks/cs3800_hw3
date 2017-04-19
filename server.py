@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 
+###################################################
+# 
+#  Brett Heinkel (bhbn8), Michael Proemsey (mkpv3b)
+#  CS3800, Section 1B, Assignement 3
+#  Group Chat Server - server.py
+#
+#  Usage: ./server.py
+#
+###################################################
+
 import socket
+import threading
 
 from sys import exit
-from threading import Thread
 from time import sleep
 
 RECV_BUFFER = 4096 
@@ -21,23 +31,26 @@ class ChatServer:
         self.users = {}
         self.client_threads = []
 
-        # attempt to bind server to address:port
         try:
+            # attempt to bind server to address:port
             self.server_socket.bind((hostname, port))
-        except socket.error as e:
+
+            # accept connections from a maximum of 10 clients
+            self.server_socket.listen(10)
+        except OSError as e:
             print("Unable to bind: {}".format(e))
-            exit()
+            exit(1)
 
-        # accept connections from a maximum of 10 clients
-        self.server_socket.listen(10)
-
-    # accept new connection and spin up threads for each client
+    # accept new connection and spin up threads for each new client
     def listen(self):
         print("Chat server started on {}:{}".format(self.hostname, self.port))
 
         while True:
             try:
                 client_socket, address = self.server_socket.accept()
+            except OSError as e:
+                print("Error accepting client connection: {}".format(e))
+                continue
             # catch ctrl+c and initiate shutdown
             except KeyboardInterrupt:
                 self.shutdown()
@@ -57,13 +70,13 @@ class ChatServer:
             self.users[username] = client_socket
              
             try:
-                self.client_threads.append(Thread(
+                self.client_threads.append(threading.Thread(
                     target = self.listen_to_client,
                     args = (username, client_socket)))
 
                 self.client_threads[-1].start()
-            except:
-                print("Error creating thread")
+            except (RuntimeError, threading.ThreadError) as e:
+                print("Error creating thread: {}".format(e))
                 return 1
 
     # manage connection to client and receive incoming messages
@@ -85,13 +98,17 @@ class ChatServer:
                     if data.strip() in ["/exit", "/quit", "/part"]:
                         print("{} command from {}".format(data.strip(), username))
 
+                        self.send_message(client_socket, "<Goodbye!>")
                         self.disconnect(username)
                         self.broadcast("<{} has disonnected>".format(username))
 
                         return
 
+                    message = "[{}] {}".format(username, data.strip())
+                    print(message)
+
                     # send message to all users but sender
-                    self.broadcast("[{}] {}".format(username, data.strip()), username)
+                    self.broadcast(message, username)
                 # socket has probably been closed
                 else:
                     self.disconnect(username)

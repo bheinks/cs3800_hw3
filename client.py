@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+###################################################
+# 
+#  Brett Heinkel (bhbn8), Michael Proemsey (mkpv3b)
+#  CS3800, Section 1B, Assignement 3
+#  Group Chat Client - client.py
+#
+#  Usage: ./client.py
+#
+###################################################
+
 import socket
 import sys
 
@@ -17,7 +27,7 @@ class ChatClient:
         # attempt to connect to remote host
         try:
             self.server_socket.connect((hostname, port))
-        except socket.error as e:
+        except OSError as e:
             print("Unable to connect: {}".format(e))
             sys.exit()
          
@@ -78,7 +88,17 @@ class ChatClient:
         return 0
 
 if __name__ == "__main__":
-    hostname, port = input("Hostname: ").split(':')
-    username = input("Username: ")
+    try:
+        hostname, port = input("Hostname: ").split(':')
+        username = input("Username: ").strip()
+    except:
+        print("Please enter valid hostname in the format hostname:port")
+    else:
+        if not username:
+            print("Please enter a valid username")
+        elif not port:
+            print("Please enter a valid port number")
+        else:
+            sys.exit(ChatClient(hostname.strip(), int(port.strip()), username).read())
 
-    sys.exit(ChatClient(hostname, int(port), username).read())
+    sys.exit(1)
